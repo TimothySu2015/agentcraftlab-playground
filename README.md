@@ -1,4 +1,4 @@
-[English](README.en.md) | **繁體中文**
+[English](README.en.md) | **繁體中文** | [日本語](README.ja.md)
 
 # AgentCraftLab Autonomous Playground
 
