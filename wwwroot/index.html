@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autonomous Agent — Live Events</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --dim: #888; --accent: #00d2ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+
+  header { padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+  header h1 { font-size: 16px; color: var(--accent); }
+  header .status { font-size: 12px; color: var(--dim); }
+  header .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; display: inline-block; }
+  header .dot.connected { background: #4caf50; }
+  .controls { margin-left: auto; display: flex; gap: 8px; }
+  .controls button { background: var(--border); color: var(--text); border: 1px solid #333; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; font-family: inherit; }
+  .controls button:hover { background: #1a4a8a; }
+
+  .toolbar { padding: 6px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-shrink: 0; font-size: 12px; }
+  .toolbar input { background: #0d1b2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-family: inherit; font-size: 12px; width: 240px; }
+  .toolbar label { color: var(--dim); cursor: pointer; user-select: none; }
+  .toolbar label input[type="checkbox"] { margin-right: 4px; }
+  .stats { color: var(--dim); margin-left: auto; }
+
+  .main { flex: 1; display: flex; overflow: hidden; }
+  #events { flex: 1; overflow-y: auto; padding: 12px 20px; scroll-behavior: smooth; }
+  .event { padding: 4px 0; border-bottom: 1px solid #ffffff08; display: flex; gap: 10px; line-height: 1.5; }
+  .event:hover { background: #ffffff06; }
+  .event .time { color: var(--dim); font-size: 11px; flex-shrink: 0; min-width: 85px; }
+  .event .badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; min-width: 120px; text-align: center; font-weight: 600; }
+  .event .agent { color: var(--dim); font-size: 12px; flex-shrink: 0; min-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+  .event .agent.sub { color: #64b5f6; }
+  .event .content { white-space: pre-wrap; word-break: break-word; flex: 1; font-size: 13px; }
+
+  /* event type colors */
+  .badge-AgentStarted { background: #1b5e20; color: #a5d6a7; }
+  .badge-AgentCompleted { background: #1b5e20; color: #a5d6a7; }
+  .badge-TextChunk { background: #263238; color: #b0bec5; }
+  .badge-ToolCall { background: #e65100; color: #ffcc80; }
+  .badge-ToolResult { background: #4a148c; color: #ce93d8; }
+  .badge-PlanGenerated { background: #4a148c; color: #b39ddb; }
+  .badge-PlanRevised { background: #bf360c; color: #ffab91; }
+  .badge-SubAgentCreated { background: #0d47a1; color: #90caf9; }
+  .badge-SubAgentAsked { background: #01579b; color: #81d4fa; }
+  .badge-SubAgentResponded { background: #006064; color: #80deea; }
+  .badge-ReasoningStep { background: #37474f; color: #b0bec5; }
+  .badge-WaitingForInput { background: #f57f17; color: #fff9c4; }
+  .badge-UserInputReceived { background: #33691e; color: #c5e1a5; }
+  .badge-WaitingForRiskApproval { background: #b71c1c; color: #ef9a9a; }
+  .badge-RiskApprovalResult { background: #880e4f; color: #f48fb1; }
+  .badge-AuditStarted { background: #311b92; color: #b39ddb; }
+  .badge-AuditCompleted { background: #1a237e; color: #9fa8da; }
+  .badge-Error { background: #b71c1c; color: #ef9a9a; }
+  .badge-WorkflowCompleted { background: #1b5e20; color: #a5d6a7; }
+  .badge-RagProcessing { background: #004d40; color: #80cbc4; }
+  .badge-RagReady { background: #004d40; color: #80cbc4; }
+  .badge-HookExecuted { background: #3e2723; color: #bcaaa4; }
+  .badge-HookBlocked { background: #3e2723; color: #bcaaa4; }
+
+  /* Round 交替背景 */
+  .round-even .event { background: rgba(0, 210, 255, 0.03); }
+  .round-odd .event { background: rgba(255, 167, 38, 0.03); }
+  .round-even .event:hover { background: rgba(0, 210, 255, 0.08); }
+  .round-odd .event:hover { background: rgba(255, 167, 38, 0.08); }
+
+  .round-header { padding: 6px 20px; font-size: 12px; font-weight: 600; border-top: 1px solid var(--border); margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+  .round-header .round-id { color: var(--accent); cursor: pointer; padding: 1px 6px; border-radius: 3px; background: rgba(0, 210, 255, 0.1); }
+  .round-header .round-id:hover { background: rgba(0, 210, 255, 0.25); }
+  .round-header .round-label { color: var(--dim); }
+  .round-header .flow-btn { background: none; border: 1px solid var(--border); color: var(--dim); border-radius: 3px; padding: 1px 8px; cursor: pointer; font-size: 11px; font-family: inherit; }
+  .round-header .flow-btn:hover { background: rgba(0, 210, 255, 0.15); color: var(--accent); }
+  .round-header .flow-btn.active { background: rgba(0, 210, 255, 0.2); color: var(--accent); border-color: var(--accent); }
+
+  /* Flow diagram panel */
+  #flowPanel { width: 0; overflow: hidden; transition: width 0.3s ease; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+  #flowPanel.open { width: 50%; min-width: 400px; }
+  #flowPanel .flow-header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  #flowPanel .flow-header .flow-title { font-size: 13px; color: var(--accent); flex: 1; }
+  #flowPanel .flow-header button { background: none; border: 1px solid var(--border); color: var(--dim); border-radius: 3px; padding: 2px 10px; cursor: pointer; font-size: 12px; font-family: inherit; }
+  #flowPanel .flow-header button:hover { color: var(--text); border-color: #666; }
+  #flowPanel .flow-body { flex: 1; overflow: auto; padding: 16px; }
+  #flowPanel .flow-body svg { max-width: 100%; }
+  #flowPanel .flow-source { display: none; padding: 12px 16px; border-top: 1px solid var(--border); max-height: 200px; overflow: auto; }
+  #flowPanel .flow-source.show { display: block; }
+  #flowPanel .flow-source pre { font-size: 11px; color: var(--dim); white-space: pre-wrap; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Autonomous Agent — Live Events</h1>
+    <span class="dot" id="statusDot"></span>
+    <span class="status" id="statusText">Connecting...</span>
+    <div class="controls">
+      <button onclick="exportJson()">Export JSON</button>
+      <button onclick="clearEvents()">Clear</button>
+      <button onclick="toggleAutoScroll()" id="scrollBtn">Auto-scroll: ON</button>
+    </div>
+  </header>
+  <div class="toolbar">
+    <input type="text" id="filter" placeholder="Filter events..." oninput="applyFilter()">
+    <select id="roundFilter" onchange="applyFilter()">
+      <option value="">All Rounds</option>
+    </select>
+    <label><input type="checkbox" id="hideTextChunk" onchange="applyFilter()"> Hide TextChunk</label>
+    <span class="stats" id="stats">Events: 0 | Rounds: 0</span>
+  </div>
+  <div class="main">
+    <div id="events"></div>
+    <div id="flowPanel">
+      <div class="flow-header">
+        <span class="flow-title" id="flowTitle">Flow Diagram</span>
+        <button onclick="toggleFlowSource()">Source</button>
+        <button onclick="closeFlowPanel()">Close</button>
+      </div>
+      <div class="flow-body" id="flowBody"></div>
+      <div class="flow-source" id="flowSource"><pre id="flowSourceCode"></pre></div>
+    </div>
+  </div>
+
+<script>
+mermaid.initialize({ theme: 'dark', startOnLoad: false, securityLevel: 'loose' });
+
+const eventsEl = document.getElementById('events');
+const filterEl = document.getElementById('filter');
+const roundFilterEl = document.getElementById('roundFilter');
+const hideTextChunkEl = document.getElementById('hideTextChunk');
+const statsEl = document.getElementById('stats');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const scrollBtn = document.getElementById('scrollBtn');
+const flowPanel = document.getElementById('flowPanel');
+const flowBody = document.getElementById('flowBody');
+const flowTitle = document.getElementById('flowTitle');
+const flowSource = document.getElementById('flowSource');
+const flowSourceCode = document.getElementById('flowSourceCode');
+
+let autoScroll = true;
+let eventCount = 0;
+let evtSource = null;
+let currentRoundId = null;
+let roundCount = 0;
+let activeFlowRound = null;
+let flowIdCounter = 0;
+const roundSet = new Set();
+const allEvents = [];
+
+function toggleAutoScroll() {
+  autoScroll = !autoScroll;
+  scrollBtn.textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
+  if (autoScroll) eventsEl.scrollTop = eventsEl.scrollHeight;
+}
+
+function clearEvents() {
+  eventsEl.innerHTML = '';
+  eventCount = 0;
+  roundCount = 0;
+  currentRoundId = null;
+  roundSet.clear();
+  allEvents.length = 0;
+  roundFilterEl.innerHTML = '<option value="">All Rounds</option>';
+  closeFlowPanel();
+  updateStats();
+}
+
+function updateStats() {
+  statsEl.textContent = `Events: ${eventCount} | Rounds: ${roundCount}`;
+}
+
+function applyFilter() {
+  const query = filterEl.value.toLowerCase();
+  const hideText = hideTextChunkEl.checked;
+  const roundId = roundFilterEl.value;
+  for (const el of eventsEl.children) {
+    const type = el.dataset.type;
+    const elRound = el.dataset.round || '';
+    const text = el.textContent.toLowerCase();
+    const matchFilter = !query || text.includes(query);
+    const matchType = !(hideText && type === 'TextChunk');
+    const matchRound = !roundId || elRound === roundId;
+    el.classList.toggle('hidden', !matchFilter || !matchType || !matchRound);
+  }
+}
+
+function filterByRound(id) {
+  roundFilterEl.value = id;
+  applyFilter();
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatMetadata(meta) {
+  if (!meta || Object.keys(meta).length === 0) return '';
+  return ' ' + Object.entries(meta).map(([k,v]) => `[${k}=${v}]`).join(' ');
+}
+
+function exportJson() {
+  if (allEvents.length === 0) return;
+  const rounds = {};
+  for (const evt of allEvents) {
+    const rid = evt.roundId || 'unknown';
+    if (!rounds[rid]) rounds[rid] = { roundId: rid, events: [] };
+    rounds[rid].events.push(evt);
+  }
+  const output = {
+    exportedAt: new Date().toISOString(),
+    totalEvents: allEvents.length,
+    totalRounds: Object.keys(rounds).length,
+    rounds: Object.values(rounds)
+  };
+  const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `autonomous-events-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// === Mermaid Flow Diagram ===
+
+function sanitizeMermaid(s) {
+  if (!s) return '';
+  return s.replace(/[#;:"<>{}|]/g, ' ').replace(/\n/g, ' ').trim();
+}
+
+function truncate(s, max) {
+  if (!s) return '';
+  return s.length <= max ? s : s.slice(0, max) + '...';
+}
+
+function generateMermaid(roundId) {
+  const events = allEvents.filter(e => e.roundId === roundId);
+  if (events.length === 0) return '';
+
+  let orchestrator = 'Agent';
+  const subAgents = [];
+  const aliasMap = {};
+  let hasTools = false, hasUser = false, hasAudit = false;
+
+  // Discover participants
+  for (const evt of events) {
+    if (evt.type === 'AgentStarted' && evt.agentName) orchestrator = evt.agentName;
+    if (evt.type === 'SubAgentCreated') {
+      const name = evt.metadata?.subAgentName || '';
+      if (name && !subAgents.includes(name)) subAgents.push(name);
+    }
+    if (evt.type === 'ToolCall') hasTools = true;
+    if (evt.type === 'WaitingForInput' || evt.type === 'WaitingForRiskApproval') hasUser = true;
+    if (evt.type === 'AuditStarted') hasAudit = true;
+  }
+
+  const lines = ['sequenceDiagram'];
+  lines.push(`    participant O as ${sanitizeMermaid(orchestrator)}`);
+  if (hasTools) lines.push('    participant T as Tools');
+  subAgents.forEach((name, i) => {
+    aliasMap[name] = `S${i}`;
+    lines.push(`    participant S${i} as ${sanitizeMermaid(name)}`);
+  });
+  if (hasUser) lines.push('    participant U as User');
+  if (hasAudit) lines.push('    participant A as Auditor');
+  lines.push('');
+
+  // Interactions
+  for (const evt of events) {
+    switch (evt.type) {
+      case 'ToolCall': {
+        const toolName = (evt.text || '').split('(')[0];
+        lines.push(`    O->>T: ${sanitizeMermaid(truncate(toolName, 30))}`);
+        break;
+      }
+      case 'ToolResult':
+        lines.push(`    T-->>O: ${sanitizeMermaid(truncate(evt.text, 40))}`);
+        break;
+      case 'SubAgentCreated': {
+        const name = evt.metadata?.subAgentName || '';
+        const alias = aliasMap[name];
+        if (alias) {
+          const instr = evt.metadata?.instructions || '';
+          const label = instr ? `create: ${truncate(instr, 25)}` : 'create';
+          lines.push(`    O->>+${alias}: ${sanitizeMermaid(label)}`);
+        }
+        break;
+      }
+      case 'SubAgentAsked': {
+        const name = evt.metadata?.subAgentName || '';
+        const alias = aliasMap[name];
+        if (alias) {
+          const msg = evt.metadata?.message || '';
+          lines.push(`    O->>+${alias}: ${sanitizeMermaid(truncate(msg, 35))}`);
+        }
+        break;
+      }
+      case 'SubAgentResponded': {
+        const name = evt.metadata?.subAgentName || '';
+        const alias = aliasMap[name];
+        if (alias) lines.push(`    ${alias}-->>-O: ${sanitizeMermaid(truncate(evt.text, 35))}`);
+        break;
+      }
+      case 'WaitingForInput':
+        lines.push(`    O->>+U: ${sanitizeMermaid(truncate(evt.text, 35))}`);
+        break;
+      case 'UserInputReceived':
+        lines.push(`    U-->>-O: ${sanitizeMermaid(truncate(evt.text, 35))}`);
+        break;
+      case 'WaitingForRiskApproval': {
+        const tool = evt.metadata?.toolName || '';
+        lines.push(`    O->>+U: Risk: ${sanitizeMermaid(tool)}`);
+        break;
+      }
+      case 'RiskApprovalResult':
+        lines.push(`    U-->>-O: ${sanitizeMermaid(truncate(evt.text, 30))}`);
+        break;
+      case 'AuditStarted':
+        lines.push('    O->>+A: audit');
+        break;
+      case 'AuditCompleted': {
+        const verdict = evt.metadata?.verdict || '';
+        lines.push(`    A-->>-O: ${sanitizeMermaid(verdict)}`);
+        break;
+      }
+      case 'ReasoningStep': {
+        const step = evt.metadata?.step || '';
+        lines.push(`    Note over O: Step ${sanitizeMermaid(step)}`);
+        break;
+      }
+      case 'PlanGenerated':
+        lines.push('    Note over O: Plan generated');
+        break;
+      case 'PlanRevised':
+        lines.push('    Note over O: Plan revised');
+        break;
+    }
+  }
+
+  return lines.join('\n');
+}
+
+async function showFlowDiagram(roundId, roundNum) {
+  // Toggle off if same round
+  if (activeFlowRound === roundId) {
+    closeFlowPanel();
+    return;
+  }
+
+  activeFlowRound = roundId;
+
+  // Update button states
+  document.querySelectorAll('.flow-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.flow-btn[data-round="${roundId}"]`);
+  if (btn) btn.classList.add('active');
+
+  const mermaidCode = generateMermaid(roundId);
+  flowTitle.textContent = `Round ${roundNum} (${roundId})`;
+  flowSourceCode.textContent = mermaidCode;
+
+  // Render mermaid
+  flowBody.innerHTML = '';
+  if (mermaidCode) {
+    try {
+      const id = `flow-${flowIdCounter++}`;
+      const { svg } = await mermaid.render(id, mermaidCode);
+      flowBody.innerHTML = svg;
+    } catch (e) {
+      flowBody.innerHTML = `<pre style="color:#ef9a9a;font-size:12px;">Render error: ${escapeHtml(e.message)}\n\nSource:\n${escapeHtml(mermaidCode)}</pre>`;
+    }
+  } else {
+    flowBody.innerHTML = '<div style="color:var(--dim);padding:20px;">No flow events in this round.</div>';
+  }
+
+  flowPanel.classList.add('open');
+}
+
+function closeFlowPanel() {
+  flowPanel.classList.remove('open');
+  flowSource.classList.remove('show');
+  activeFlowRound = null;
+  document.querySelectorAll('.flow-btn').forEach(b => b.classList.remove('active'));
+}
+
+function toggleFlowSource() {
+  flowSource.classList.toggle('show');
+}
+
+// === Event handling ===
+
+function addEvent(data) {
+  allEvents.push(data);
+  const roundId = data.roundId || '';
+
+  // 新 Round 偵測 — 插入分隔 header
+  if (roundId && roundId !== currentRoundId) {
+    currentRoundId = roundId;
+    roundCount++;
+    roundSet.add(roundId);
+
+    const opt = document.createElement('option');
+    opt.value = roundId;
+    opt.textContent = `Round ${roundCount} (${roundId})`;
+    roundFilterEl.appendChild(opt);
+
+    const rn = roundCount; // capture for closure
+    const header = document.createElement('div');
+    header.className = `round-header ${roundCount % 2 === 0 ? 'round-even' : 'round-odd'}`;
+    header.dataset.round = roundId;
+    header.innerHTML =
+      `<span class="round-label">Round ${roundCount}</span>` +
+      `<span class="round-id" onclick="filterByRound('${escapeHtml(roundId)}')" title="Click to filter">${escapeHtml(roundId)}</span>` +
+      `<span class="round-label">${escapeHtml(data.timestamp)}</span>` +
+      `<button class="flow-btn" data-round="${escapeHtml(roundId)}" onclick="showFlowDiagram('${escapeHtml(roundId)}', ${rn})">Flow</button>`;
+    eventsEl.appendChild(header);
+  }
+
+  const el = document.createElement('div');
+  el.className = `event ${roundCount % 2 === 0 ? 'round-even' : 'round-odd'}`;
+  el.dataset.type = data.type;
+  el.dataset.round = roundId;
+
+  const metaStr = formatMetadata(data.metadata);
+  const subAgent = data.metadata?.subAgentName;
+  const displayAgent = subAgent || data.agentName;
+  const agentClass = subAgent ? 'agent sub' : 'agent';
+  el.innerHTML =
+    `<span class="time">${escapeHtml(data.timestamp)}</span>` +
+    `<span class="badge badge-${escapeHtml(data.type)}">${escapeHtml(data.type)}</span>` +
+    `<span class="${agentClass}">${escapeHtml(displayAgent)}</span>` +
+    `<span class="content">${escapeHtml(data.text)}${escapeHtml(metaStr)}</span>`;
+
+  const query = filterEl.value.toLowerCase();
+  const hideText = hideTextChunkEl.checked;
+  const filterRound = roundFilterEl.value;
+  if ((query && !el.textContent.toLowerCase().includes(query)) ||
+      (hideText && data.type === 'TextChunk') ||
+      (filterRound && roundId !== filterRound)) {
+    el.classList.add('hidden');
+  }
+
+  eventsEl.appendChild(el);
+  eventCount++;
+  updateStats();
+
+  if (autoScroll) eventsEl.scrollTop = eventsEl.scrollHeight;
+}
+
+function connect() {
+  if (evtSource) evtSource.close();
+  evtSource = new EventSource('/events');
+
+  evtSource.onopen = () => {
+    statusDot.className = 'dot connected';
+    statusText.textContent = 'Connected';
+  };
+
+  evtSource.onmessage = (e) => {
+    try { addEvent(JSON.parse(e.data)); } catch {}
+  };
+
+  evtSource.onerror = () => {
+    statusDot.className = 'dot';
+    statusText.textContent = 'Reconnecting...';
+  };
+}
+
+connect();
+</script>
+</body>
+</html>
