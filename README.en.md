@@ -23,6 +23,7 @@ An interactive console for autonomous AI agents — built on the ReAct loop arch
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Azure OpenAI Service](https://learn.microsoft.com/azure/ai-services/openai/how-to/create-resource) — Deploy at least one GPT model (gpt-4o-mini or gpt-4o recommended)
+- [Grounding with Bing Search](https://learn.microsoft.com/azure/ai-services/openai/how-to/search?tabs=bing-grounding) — Required for the `azure_web_search` tool. Connect a Grounding with Bing Search resource in Azure AI Foundry (optional — `web_search` via DuckDuckGo works without it)
 
 ## Quick Start
 

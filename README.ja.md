@@ -23,6 +23,7 @@
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Azure OpenAI Service](https://learn.microsoft.com/azure/ai-services/openai/how-to/create-resource) — GPTモデルを少なくとも1つデプロイ（gpt-4o-miniまたはgpt-4o推奨）
+- [Grounding with Bing Search](https://learn.microsoft.com/azure/ai-services/openai/how-to/search?tabs=bing-grounding) — `azure_web_search`ツールの使用にはAzure AI FoundryでGrounding with Bing Searchリソースの接続が必要（任意 — `web_search`はDuckDuckGo経由で設定不要）
 
 ## クイックスタート
 
