@@ -81,6 +81,14 @@ var azureEndpoint = llmConfig["Endpoint"] ?? Environment.GetEnvironmentVariable(
 var orchestratorModel = llmConfig["Model"] ?? Environment.GetEnvironmentVariable("ORCHESTRATOR_MODEL") ?? "gpt-4o-mini";
 const string provider = "azure-openai";
 
+// 自動修正：偵測 ApiKey 和 Endpoint 填反的情況
+if (azureEndpoint.Length > 0 && !azureEndpoint.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+    && apiKey.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+{
+    (apiKey, azureEndpoint) = (azureEndpoint, apiKey);
+    AnsiConsole.MarkupLine("[yellow]偵測到 ApiKey 與 Endpoint 填反，已自動修正[/]");
+}
+
 if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(azureEndpoint))
 {
     AnsiConsole.MarkupLine("[red]Error: 請在 appsettings.json 設定 Azure OpenAI 憑證[/]");
@@ -96,6 +104,14 @@ if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(azureEndpoint
     AnsiConsole.MarkupLine("");
     AnsiConsole.MarkupLine("[cyan]申請 Azure OpenAI Service：[/]");
     AnsiConsole.MarkupLine("[dim]https://learn.microsoft.com/azure/ai-services/openai/how-to/create-resource[/]");
+    return;
+}
+
+// 驗證 Endpoint 格式
+if (!Uri.TryCreate(azureEndpoint, UriKind.Absolute, out _))
+{
+    AnsiConsole.MarkupLine($"[red]Error: Endpoint 格式無效：{Markup.Escape(azureEndpoint)}[/]");
+    AnsiConsole.MarkupLine("[dim]正確格式：https://your-resource.openai.azure.com/[/]");
     return;
 }
 
